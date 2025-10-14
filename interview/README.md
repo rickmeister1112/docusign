@@ -2,6 +2,14 @@
 
 A full-stack web application for managing feedback submissions with upvote capabilities. Built with React + TypeScript + Vite for the frontend and FastAPI + SQLite for the backend.
 
+## 📚 Documentation
+
+- **[Code Review & Issues](CODE_REVIEW.md)** - Comprehensive analysis of code issues and improvements needed
+- **[Technical Documentation](TECHNICAL_DOCUMENTATION.md)** - Complete implementation guide with code examples
+- **[Improvements Roadmap](IMPROVEMENTS_ROADMAP.md)** - Phased plan for implementing improvements
+- **[Setup Guide](SETUP.md)** - Quick setup and troubleshooting
+- **[Authentication Summary](AUTHENTICATION_SUMMARY.md)** - Authentication system documentation
+
 ## Features
 
 - **Create Feedback**: Submit new feedback entries with text content
