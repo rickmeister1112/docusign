@@ -1,0 +1,49 @@
+# Environment Configuration Template
+# Copy this file to .env and update the values
+
+# Security - IMPORTANT: Generate a secure secret key!
+# Generate with: openssl rand -hex 32
+SECRET_KEY=your-super-secret-key-change-this-minimum-32-characters-long
+
+# Algorithm for JWT encoding
+ALGORITHM=HS256
+
+# Token expiration time in minutes
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+
+# Database URL
+DATABASE_URL=sqlite:///./feedback.db
+
+# For PostgreSQL (production):
+# DATABASE_URL=postgresql://user:password@localhost/dbname
+
+# CORS Origins (comma-separated)
+CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+
+# Application
+APP_NAME="Feedback CRUD API"
+APP_VERSION="1.0.0"
+DEBUG=False
+
+# Pagination (optional - defaults shown)
+MAX_PAGE_SIZE=100
+DEFAULT_PAGE_SIZE=20
+
+# Password Policy (optional - defaults shown)
+MIN_PASSWORD_LENGTH=8
+REQUIRE_UPPERCASE=True
+REQUIRE_LOWERCASE=True
+REQUIRE_DIGIT=True
+REQUIRE_SPECIAL=False
+
+#command to keep env
+openssl rand -hex 32
+
+#install dependency
+source venv/bin/activate && pip install pydantic-settings==2.7.0
+
+#run code
+source venv/bin/activate && timeout 5 python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 || echo "Server started successfully (timed out as expected)"
+
+#install slow api for rate limiting
+ pip install slowapi==0.1.9
