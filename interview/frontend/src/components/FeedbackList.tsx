@@ -21,12 +21,10 @@ const FeedbackList: React.FC<FeedbackListProps> = ({
   currentUserEmail,
 }) => {
   const [sortedFeedbacks, setSortedFeedbacks] = useState<Feedback[]>([]);
-  const [renderCount, setRenderCount] = useState(0);
 
   useEffect(() => {
     const sorted = [...feedbacks].sort((a, b) => b.upvotes - a.upvotes);
     setSortedFeedbacks(sorted);
-    setRenderCount((prev) => prev + 1);
   }, [feedbacks]);
 
   const formatDate = (dateString: string): string => {
@@ -83,7 +81,7 @@ const FeedbackList: React.FC<FeedbackListProps> = ({
   return (
     <div className="feedback-list">
       <h2>
-        Feedback Entries ({sortedFeedbacks.length}) - Renders: {renderCount}
+        Feedback Entries ({sortedFeedbacks.length})
       </h2>
       <div className="feedback-items">
         {sortedFeedbacks.map((feedback) => (
