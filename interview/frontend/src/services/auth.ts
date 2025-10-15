@@ -1,5 +1,6 @@
 import type { User, UserCreate, UserLogin, Token } from "../types/feedback";
 import { config } from "../config/env";
+import { storage } from "../utils/storage";
 
 const API_BASE_URL = config.apiBaseUrl;
 
@@ -7,8 +8,8 @@ class AuthService {
   private token: string | null = null;
 
   constructor() {
-    // Load token from localStorage on initialization
-    this.token = localStorage.getItem("auth_token");
+    // Load token from storage on initialization
+    this.token = storage.getItem("auth_token");
   }
 
   private getHeaders(): HeadersInit {
@@ -77,12 +78,12 @@ class AuthService {
 
   logout(): void {
     this.token = null;
-    localStorage.removeItem("auth_token");
+    storage.removeItem("auth_token");
   }
 
   setToken(token: string): void {
     this.token = token;
-    localStorage.setItem("auth_token", token);
+    storage.setItem("auth_token", token);
   }
 
   getToken(): string | null {

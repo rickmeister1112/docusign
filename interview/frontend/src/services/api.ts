@@ -7,6 +7,7 @@ import type {
 } from "../types/feedback";
 import { config } from "../config/env";
 import { authEvents } from "../utils/authEvents";
+import { storage } from "../utils/storage";
 
 // API base URL from environment configuration
 const API_BASE_URL = config.apiBaseUrl;
@@ -22,7 +23,7 @@ const api = axios.create({
 // Add request interceptor to include auth token
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem("auth_token");
+    const token = storage.getItem("auth_token");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -40,7 +41,7 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       // Clear token and emit unauthorized event
       // AuthProvider will handle the logout
-      localStorage.removeItem("auth_token");
+      storage.removeItem("auth_token");
       authEvents.emit('unauthorized');
     }
     return Promise.reject(error);
