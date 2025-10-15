@@ -56,9 +56,34 @@ function AppContent() {
   };
 
   const handleUpvoteFeedback = async (id: number) => {
+    // Find the feedback to get current state
+    const targetFeedback = feedbacks.find(f => f.id === id);
+    if (!targetFeedback) return;
+    
+    // Optimistic update: Update UI immediately for instant feedback
+    const wasUpvoted = targetFeedback.has_upvoted;
+    const optimisticUpvotes = wasUpvoted 
+      ? targetFeedback.upvotes - 1 
+      : targetFeedback.upvotes + 1;
+    
+    setFeedbacks((prev) =>
+      prev.map((feedback) =>
+        feedback.id === id
+          ? { 
+              ...feedback, 
+              upvotes: optimisticUpvotes,
+              has_upvoted: !wasUpvoted
+            }
+          : feedback
+      )
+    );
+
+    // Make API call in background
     try {
       setError("");
       const response = await feedbackApi.upvote(id);
+      
+      // Update with actual server response (in case of race conditions)
       setFeedbacks((prev) =>
         prev.map((feedback) =>
           feedback.id === id
@@ -71,6 +96,18 @@ function AppContent() {
         )
       );
     } catch (err) {
+      // Rollback optimistic update on error
+      setFeedbacks((prev) =>
+        prev.map((feedback) =>
+          feedback.id === id
+            ? { 
+                ...feedback, 
+                upvotes: targetFeedback.upvotes,
+                has_upvoted: targetFeedback.has_upvoted
+              }
+            : feedback
+        )
+      );
       setError("Failed to upvote feedback. Please try again.");
       console.error("Error upvoting feedback:", err);
     }
