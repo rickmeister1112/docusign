@@ -1,6 +1,7 @@
 import type { User, UserCreate, UserLogin, Token } from "../types/feedback";
 import { config } from "../config/env";
 import { storage } from "../utils/storage";
+import { tokenManager } from "../utils/tokenManager";
 
 const API_BASE_URL = config.apiBaseUrl;
 
@@ -10,6 +11,28 @@ class AuthService {
   constructor() {
     // Load token from storage on initialization
     this.token = storage.getItem("auth_token");
+    
+    // Set up token expiry handling
+    this.setupTokenExpiryHandling();
+  }
+
+  private setupTokenExpiryHandling(): void {
+    // Handle token expiry
+    tokenManager.setOnTokenExpiry(() => {
+      this.logout();
+    });
+
+    // Handle token refresh (for now, just logout - can be enhanced later)
+    tokenManager.setOnTokenRefresh(async () => {
+      // TODO: Implement token refresh endpoint on backend
+      // For now, return false to trigger logout
+      return false;
+    });
+
+    // Start monitoring if we have a token
+    if (this.token) {
+      tokenManager.startMonitoring(this.token);
+    }
   }
 
   private getHeaders(): HeadersInit {
@@ -79,11 +102,17 @@ class AuthService {
   logout(): void {
     this.token = null;
     storage.removeItem("auth_token");
+    
+    // Stop token monitoring
+    tokenManager.stopMonitoring();
   }
 
   setToken(token: string): void {
     this.token = token;
     storage.setItem("auth_token", token);
+    
+    // Start monitoring the new token
+    tokenManager.startMonitoring(token);
   }
 
   getToken(): string | null {
@@ -91,7 +120,11 @@ class AuthService {
   }
 
   isAuthenticated(): boolean {
-    return this.token !== null;
+    return this.token !== null && !tokenManager.isTokenExpired(this.token);
+  }
+
+  isTokenExpired(): boolean {
+    return this.token ? tokenManager.isTokenExpired(this.token) : true;
   }
 }
 
