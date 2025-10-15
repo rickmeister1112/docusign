@@ -107,10 +107,10 @@ const FeedbackList: React.FC<FeedbackListProps> = ({
               {onUpvote && (
                 <button
                   onClick={() => handleUpvote(feedback.id)}
-                  className="upvote-button"
-                  title="Upvote this feedback"
+                  className={`upvote-button ${feedback.has_upvoted ? 'upvoted' : ''}`}
+                  title={feedback.has_upvoted ? "Remove your upvote" : "Upvote this feedback"}
                 >
-                  👍 {feedback.upvotes}
+                  {feedback.has_upvoted ? '👍' : '👍'} {feedback.upvotes}
                 </button>
               )}
               {onDelete && currentUserEmail === feedback.user_email && (

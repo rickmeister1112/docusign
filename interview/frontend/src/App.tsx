@@ -58,11 +58,15 @@ function AppContent() {
   const handleUpvoteFeedback = async (id: number) => {
     try {
       setError("");
-      const updatedFeedback = await feedbackApi.upvote(id);
+      const response = await feedbackApi.upvote(id);
       setFeedbacks((prev) =>
         prev.map((feedback) =>
           feedback.id === id
-            ? { ...feedback, upvotes: updatedFeedback.upvotes }
+            ? { 
+                ...feedback, 
+                upvotes: response.upvotes,
+                has_upvoted: response.has_upvoted 
+              }
             : feedback
         )
       );

@@ -7,6 +7,7 @@ export interface Feedback {
   user_email: string;
   created_at: string;
   updated_at?: string;
+  has_upvoted: boolean;
 }
 
 export interface FeedbackCreate {
@@ -20,6 +21,8 @@ export interface FeedbackUpdate {
 export interface UpvoteResponse {
   id: number;
   upvotes: number;
+  has_upvoted: boolean;
+  message: string;
 }
 
 // Authentication types

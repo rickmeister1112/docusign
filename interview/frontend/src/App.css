@@ -317,6 +317,18 @@ body {
   transform: translateY(-1px);
 }
 
+/* Upvoted state - user has already upvoted */
+.upvote-button.upvoted {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(245, 87, 108, 0.3);
+}
+
+.upvote-button.upvoted:hover {
+  background: linear-gradient(135deg, #f5576c 0%, #f093fb 100%);
+  box-shadow: 0 4px 12px rgba(245, 87, 108, 0.5);
+}
+
 .delete-button {
   background-color: #dc3545;
   color: white;
