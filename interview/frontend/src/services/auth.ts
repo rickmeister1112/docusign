@@ -1,6 +1,7 @@
 import type { User, UserCreate, UserLogin, Token } from "../types/feedback";
+import { config } from "../config/env";
 
-const API_BASE_URL = "http://localhost:8000";
+const API_BASE_URL = config.apiBaseUrl;
 
 class AuthService {
   private token: string | null = null;

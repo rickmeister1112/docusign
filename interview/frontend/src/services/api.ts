@@ -5,9 +5,11 @@ import type {
   FeedbackUpdate,
   UpvoteResponse,
 } from "../types/feedback";
+import { config } from "../config/env";
+import { authEvents } from "../utils/authEvents";
 
-// API base URL - FastAPI server
-const API_BASE_URL = "http://localhost:8000";
+// API base URL from environment configuration
+const API_BASE_URL = config.apiBaseUrl;
 
 // Create axios instance with default configuration
 const api = axios.create({
@@ -36,9 +38,10 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Clear token and redirect to login if unauthorized
+      // Clear token and emit unauthorized event
+      // AuthProvider will handle the logout
       localStorage.removeItem("auth_token");
-      window.location.href = "/login";
+      authEvents.emit('unauthorized');
     }
     return Promise.reject(error);
   }
