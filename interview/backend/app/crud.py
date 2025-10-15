@@ -1,28 +1,46 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from typing import List, Optional
 from . import models, schemas
 from .auth import get_password_hash
+import logging
+
+# Setup logger for database operations
+logger = logging.getLogger(__name__)
 
 
 # User management functions
-def create_user(db: Session, user: schemas.UserCreate) -> models.User:
+def create_user(db: Session, user: schemas.UserCreate) -> Optional[models.User]:
     """
-    Create a new user account in the database.
+    Create a new user account in the database with error handling.
 
     Args:
         db: Database session
         user: User data to create
 
     Returns:
-        Created user model instance
+        Created user model instance or None if creation fails
+        
+    Raises:
+        IntegrityError: If email already exists (duplicate)
+        SQLAlchemyError: For other database errors
     """
-    hashed_password = get_password_hash(user.password)
-    db_user = models.User(email=user.email, hashed_password=hashed_password)
-    db.add(db_user)
-    db.commit()
-    db.refresh(db_user)
-    return db_user
+    try:
+        hashed_password = get_password_hash(user.password)
+        db_user = models.User(email=user.email, hashed_password=hashed_password)
+        db.add(db_user)
+        db.commit()
+        db.refresh(db_user)
+        return db_user
+    except IntegrityError as e:
+        db.rollback()
+        logger.error(f"Integrity error creating user {user.email}: {str(e)}")
+        raise  # Re-raise to be handled by endpoint
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error(f"Database error creating user {user.email}: {str(e)}")
+        raise  # Re-raise to be handled by endpoint
 
 
 def get_user(db: Session, user_id: int) -> Optional[models.User]:
@@ -71,9 +89,9 @@ def get_users(db: Session, skip: int = 0, limit: int = 100) -> List[models.User]
 # Feedback management functions
 def create_feedback(
     db: Session, feedback: schemas.FeedbackCreate, user_id: int
-) -> models.Feedback:
+) -> Optional[models.Feedback]:
     """
-    Create a new feedback entry in the database.
+    Create a new feedback entry in the database with error handling.
 
     Args:
         db: Database session
@@ -81,13 +99,21 @@ def create_feedback(
         user_id: ID of the user creating the feedback
 
     Returns:
-        Created feedback model instance
+        Created feedback model instance or None if creation fails
+        
+    Raises:
+        SQLAlchemyError: For database errors
     """
-    db_feedback = models.Feedback(text=feedback.text, user_id=user_id)
-    db.add(db_feedback)
-    db.commit()
-    db.refresh(db_feedback)
-    return db_feedback
+    try:
+        db_feedback = models.Feedback(text=feedback.text, user_id=user_id)
+        db.add(db_feedback)
+        db.commit()
+        db.refresh(db_feedback)
+        return db_feedback
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error(f"Database error creating feedback for user {user_id}: {str(e)}")
+        raise
 
 
 def get_feedback(db: Session, feedback_id: int) -> Optional[models.Feedback]:
@@ -172,6 +198,59 @@ def check_user_upvoted(db: Session, feedback_id: int, user_id: int) -> bool:
     return upvote is not None
 
 
+def get_actual_upvote_count(db: Session, feedback_id: int) -> int:
+    """
+    Calculate the actual upvote count from the Upvote table.
+    This is the source of truth for upvote counts.
+    
+    Args:
+        db: Database session
+        feedback_id: ID of the feedback
+        
+    Returns:
+        Actual number of upvotes from Upvote table
+    """
+    count = db.query(models.Upvote).filter(
+        models.Upvote.feedback_id == feedback_id
+    ).count()
+    return count
+
+
+def sync_upvote_count(db: Session, feedback_id: int) -> Optional[models.Feedback]:
+    """
+    Sync the feedback upvote count with actual count from Upvote table.
+    Fixes any inconsistencies between stored count and actual upvotes.
+    
+    Args:
+        db: Database session
+        feedback_id: ID of the feedback to sync
+        
+    Returns:
+        Updated feedback with correct count or None if not found
+    """
+    try:
+        db_feedback = get_feedback(db, feedback_id)
+        if db_feedback is None:
+            return None
+        
+        # Get actual count from Upvote table
+        actual_count = get_actual_upvote_count(db, feedback_id)
+        
+        # Update only if different
+        if db_feedback.upvotes != actual_count:
+            old_count = db_feedback.upvotes
+            db_feedback.upvotes = actual_count
+            db.commit()
+            db.refresh(db_feedback)
+            logger.info(f"Synced upvote count for feedback {feedback_id}: {old_count} -> {actual_count}")
+        
+        return db_feedback
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error(f"Error syncing upvote count for feedback {feedback_id}: {str(e)}")
+        raise
+
+
 def toggle_upvote_feedback(db: Session, feedback_id: int, user_id: int) -> tuple[Optional[models.Feedback], bool, str]:
     """
     Toggle upvote for a feedback entry (add if not exists, remove if exists).
@@ -188,27 +267,34 @@ def toggle_upvote_feedback(db: Session, feedback_id: int, user_id: int) -> tuple
     if db_feedback is None:
         return None, False, "Feedback not found"
 
-    # Check if user has already upvoted
-    existing_upvote = db.query(models.Upvote).filter(
-        models.Upvote.feedback_id == feedback_id,
-        models.Upvote.user_id == user_id
-    ).first()
+    try:
+        # Check if user has already upvoted
+        existing_upvote = db.query(models.Upvote).filter(
+            models.Upvote.feedback_id == feedback_id,
+            models.Upvote.user_id == user_id
+        ).first()
 
-    if existing_upvote:
-        # Remove upvote
-        db.delete(existing_upvote)
-        db_feedback.upvotes -= 1
-        db.commit()
-        db.refresh(db_feedback)
-        return db_feedback, False, "Upvote removed"
-    else:
-        # Add upvote
-        new_upvote = models.Upvote(user_id=user_id, feedback_id=feedback_id)
-        db.add(new_upvote)
-        db_feedback.upvotes += 1
-        db.commit()
-        db.refresh(db_feedback)
-        return db_feedback, True, "Upvoted successfully"
+        if existing_upvote:
+            # Remove upvote
+            db.delete(existing_upvote)
+            db.commit()
+            
+            # Sync count from actual Upvote table (source of truth)
+            db_feedback = sync_upvote_count(db, feedback_id)
+            return db_feedback, False, "Upvote removed"
+        else:
+            # Add upvote
+            new_upvote = models.Upvote(user_id=user_id, feedback_id=feedback_id)
+            db.add(new_upvote)
+            db.commit()
+            
+            # Sync count from actual Upvote table (source of truth)
+            db_feedback = sync_upvote_count(db, feedback_id)
+            return db_feedback, True, "Upvoted successfully"
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error(f"Database error toggling upvote for feedback {feedback_id}, user {user_id}: {str(e)}")
+        raise
 
 
 def upvote_feedback(db: Session, feedback_id: int) -> Optional[models.Feedback]:
@@ -257,14 +343,19 @@ def update_feedback(
     if db_feedback.user_id != user_id:
         return None
 
-    # Update only provided fields
-    update_data = feedback.dict(exclude_unset=True)
-    for field, value in update_data.items():
-        setattr(db_feedback, field, value)
+    try:
+        # Update only provided fields
+        update_data = feedback.dict(exclude_unset=True)
+        for field, value in update_data.items():
+            setattr(db_feedback, field, value)
 
-    db.commit()
-    db.refresh(db_feedback)
-    return db_feedback
+        db.commit()
+        db.refresh(db_feedback)
+        return db_feedback
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error(f"Database error updating feedback {feedback_id}: {str(e)}")
+        raise
 
 
 def delete_feedback(db: Session, feedback_id: int, user_id: int) -> bool:
@@ -287,6 +378,11 @@ def delete_feedback(db: Session, feedback_id: int, user_id: int) -> bool:
     if db_feedback.user_id != user_id:
         return False
 
-    db.delete(db_feedback)
-    db.commit()
-    return True
+    try:
+        db.delete(db_feedback)
+        db.commit()
+        return True
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error(f"Database error deleting feedback {feedback_id}: {str(e)}")
+        raise
