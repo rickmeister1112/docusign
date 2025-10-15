@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { authService } from "../services/auth.ts";
 import type { User, AuthContextType } from "../types/feedback.ts";
 import { AuthContext } from "./AuthContext.ts";
+import { authEvents } from "../utils/authEvents";
 
 interface AuthProviderProps {
   children: ReactNode;
@@ -32,6 +33,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
 
     initializeAuth();
+  }, []);
+
+  // Listen for unauthorized events from API interceptor
+  useEffect(() => {
+    const unsubscribe = authEvents.on('unauthorized', () => {
+      // Clear user state when unauthorized (401) is detected
+      setUser(null);
+      setToken(null);
+      authService.logout();
+    });
+
+    // Cleanup: unsubscribe when component unmounts
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   const login = async (email: string, password: string) => {
